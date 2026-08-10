@@ -1,0 +1,40 @@
+# Owner Policy advisor - a template for your personal rules.
+#
+# This is a starting point for an advisor that watches whether the
+# agent's behavior matches YOUR rules and preferences. It is disabled
+# here and not part of the shipped roster.
+#
+# To use it: copy the OwnerPolicy entry below into your WATCHDOG.yml,
+# fill in the placeholders, and set enabled: true.
+#
+# Common things people put in their own policy advisor:
+#   - scope discipline: no scope creep beyond what was asked
+#   - no fake-complete: no "done" or "should work" without proof
+#   - secrets: never print, log, or commit credentials
+#   - reporting: plain words, short sentences, no filler
+#   - a preferences file to check output against
+
+instructions: |
+  Review against the user's stated goal and the project's own conventions.
+  Prefer concrete evidence (file, symbol, line) over generic advice.
+  At most one note per update; escalate severity only when material.
+  If you make any change (edit, write, or state-changing command),
+  disclose it in your advice note: name the files and state exactly
+  what you did.
+
+advisors:
+  - name: OwnerPolicy
+    enabled: false
+    tools: [read, bash, edit, ast_grep, ast_edit, ask, debug, eval, github, glob, grep, lsp, inspect_image, browser, computer, checkpoint, rewind, security_scan, task, hub, todo, web_search, write, memory_edit, retain, recall, reflect, learn, manage_skill]
+    instructions: |
+      Watch that the agent's behavior matches <your name>'s rules and
+      preferences. Scope: no scope creep beyond what was asked, no
+      fake-complete status, no "should work" without verification,
+      no placeholder slop, no silent skips. Secrets never printed.
+      Plans stay in chat unless a file was asked for. Escalate only
+      what truly needs <your name>, at most 3 yes/no questions, and
+      name the safe default. Leave the environment as found: no stray
+      files, tabs, or processes. Check <path to your preferences file,
+      if you keep one> by grepping relevant slices; flag output that
+      contradicts written preferences. Plain words, short sentences,
+      no AI tells.
