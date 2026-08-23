@@ -20,7 +20,7 @@
   EVIDENCE: independent final grade PASS — bounded core, cancellation, evidence/dissent, explicit-only behavior, async baseline comparison, and installed load compatibility; no blockers
 - [x] G6 Live extension loads and explicit command registers
   EVIDENCE: isolated installed OMP loader loaded the bundle, registered `/fusion` and `session_shutdown`, and completed a bounded two-candidate injected command; 29 checks passed
-- [ ] G7 Repository commit and normal push succeed
-  EVIDENCE: pending
-- [ ] G8 Deployment is byte-identical to committed extension package
-  EVIDENCE: pending
+- [x] G7 Repository commit and normal push succeed
+  EVIDENCE: commit `fdc7a0f` created on `agent/fusion-extension`; normal push created and tracks `origin/agent/fusion-extension`
+- [x] G8 Deployment is byte-identical to committed extension package
+  EVIDENCE: `cmp fusion/fusion.js ~/.omp/agent/extensions/fusion.js` exit 0; both SHA-256 `011315055719301026ba5c1bafe57e9aec4f02a4f0571dba5d530ad60f9426ce`; `pi --no-extensions -e ~/.omp/agent/extensions/fusion.js --help` exit 0

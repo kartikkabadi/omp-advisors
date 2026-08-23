@@ -8,7 +8,7 @@ Units: 6
 | 3 | Build benchmark harness | fusion/benchmark.ts, fusion/benchmark.test.ts | FusionBenchmark | Deterministic single-agent comparison emits measurable JSON | verified | Async baseline/fusion and split error metrics covered by passing suite |
 | 4 | Add package and operator docs | package.json, README.md | FusionDocs | Typecheck/test commands and operating contract are documented | verified | Scripts ran; README matches timeout and async benchmark contract |
 | 5 | Independent implementation review | read-only fusion artifacts | FusionReviewer | Correctness, cancellation, security, and scope findings resolved | verified | Independent grade PASS after findings were fixed; no blockers |
-| 6 | Live deployment and smoke test | ~/.omp/agent/extensions/fusion.js | Main | Installed byte-identical bundle loads and bounded dry run succeeds | pending | Isolated installed-loader smoke passed; live deployment pending |
+| 6 | Live deployment and smoke test | ~/.omp/agent/extensions/fusion.js | Main | Installed byte-identical bundle loads and bounded dry run succeeds | verified | Byte-identical deploy; explicit extension load exit 0; isolated bounded command smoke passed |
 
 ## Evidence
 
@@ -17,4 +17,4 @@ Units: 6
 - Unit 3: passing tests cover asynchronous baseline/fusion runners and separate baseline/fusion error totals.
 - Unit 4: scripts ran successfully; README documents explicit invocation, the 2-8 bound, 120-second native child timeout, cancellation, and async benchmark use.
 - Unit 5: independent final grade returned PASS for all six release contracts with no substantive blocker.
-- Unit 6: isolated installed-loader smoke passed. Live deployment, byte comparison, commit, and push remain for Main.
+- Unit 6: deployed `fusion/fusion.js` to `~/.omp/agent/extensions/fusion.js`; `cmp` exit 0; matching SHA-256 `011315055719301026ba5c1bafe57e9aec4f02a4f0571dba5d530ad60f9426ce`; explicit extension load exit 0; isolated bounded command smoke passed.
