@@ -1,10 +1,20 @@
 # Delegation plan
-Units: 5
+Units: 6
 
-| # | Unit | Files (mine) | Worker (subagent) | Acceptance | Status | Evidence |
-|---|------|--------------|-------------------|------------|--------|----------|
-| 1 | Trace OMP advisor runtime and tool contract | read-only OMP installation/config | RuntimeScout | Exact runtime behavior and valid tool policy proven | verified | Runtime fact captured and independently applied: configured tools are intersected with the session pool, so an unavailable tool call quarantines the whole response. Applied as the core design constraint in WATCHDOG.yml — every role gets one broad common tool tier so no role-specific quarantine is possible — and re-checked against the shipped roster. |
-| 2 | Audit existing roster domains and design 100-role world taxonomy | read-only WATCHDOG.yml | TaxonomyArchitect | Exactly 100 non-overlapping roles across broad life/work/world domains | verified | Taxonomy artifact (agent://TaxonomyArchitect) delivered 100 unique roles across 13 domains with exact counts 16/9/8/8/8/7/7/7/7/7/5/5/6; roster applied verbatim to WATCHDOG.yml and validator enforces the counts — independently confirmed via validate.py (8/8 contract groups) and `git diff --check`. |
-| 3 | Rewrite canonical roster and validator | WATCHDOG.yml, validate.py, README.md | RosterBuilder | Canonical validator passes and all roles have proactive/notification/tool contracts | verified | WATCHDOG.yml rewritten (100 roles, 13 domains, shared common tier, hard shared contract); validate.py enforces domain counts, common grant, exact model, notification/initiative/high-impact phrases. `python3 validate.py --canonical --check-contract WATCHDOG.yml` passes (8/8 contract groups); `py_compile` OK; 7 deliberately broken variants all rejected; `git diff --check` clean. |
-| 4 | Align Pi integration with expanded advisor tools | pi-adviser/adviser.ts, roster.ts, test.ts | PiBuilder | Pi exposes intended tools safely and test suite passes | verified | Implemented by PiBuilder + PiFinisher in /Users/user/pi-adviser at commit e1bc72e769d89f926ab36941196e9a8c8086051d. `bun test.ts` 143/143 pass; strict `tsc --noEmit` exit 0; zero tools surfaced with a requestedAction flag; tool-less trigger confirmed. |
-| 5 | Independent final review | read-only all artifacts | FinalGrader | Every acceptance criterion receives PASS with evidence | verified | BoundedVerifier reviewed scope and correctness of all artifacts but did not independently execute commands. Main independently ran the verification: canonical source/live validation (`python3 validate.py --canonical --check-contract`, 8/8 contract groups), live WATCHDOG.yml SHA256 b23bb23c2afbeaab110704796d8387b229922d56e34ca441697ffe2a5d87805c vs canonical source, Pi suite (143/143) and strict tsc, `git diff --check`, and remote SHA checks — remote OMP branch agent/proactive-world-advisors at fa62f2f, Pi at e1bc72e before this ledger commit. |
+| # | Unit | Files (mine) | Worker | Acceptance | Status | Evidence |
+|---|---|---|---|---|---|---|
+| 1 | Build bounded fusion domain core | fusion/core.ts, fusion/core.test.ts | FusionCore | Bounded fan-out, adaptive stopping, evidence, dissent, and abort behavior pass focused tests | verified | `bun test fusion/`: 60 pass / 0 fail; source typecheck exit 0 |
+| 2 | Build OMP extension integration | fusion/index.ts, fusion/index.test.ts | FusionExtension | Native command and shutdown lifecycle work without hidden mutation | verified | Installed loader registered `/fusion` and `session_shutdown`; full injected command path passed |
+| 3 | Build benchmark harness | fusion/benchmark.ts, fusion/benchmark.test.ts | FusionBenchmark | Deterministic single-agent comparison emits measurable JSON | verified | Async baseline/fusion and split error metrics covered by passing suite |
+| 4 | Add package and operator docs | package.json, README.md | FusionDocs | Typecheck/test commands and operating contract are documented | verified | Scripts ran; README matches timeout and async benchmark contract |
+| 5 | Independent implementation review | read-only fusion artifacts | FusionReviewer | Correctness, cancellation, security, and scope findings resolved | verified | Independent grade PASS after findings were fixed; no blockers |
+| 6 | Live deployment and smoke test | ~/.omp/agent/extensions/fusion.js | Main | Installed byte-identical bundle loads and bounded dry run succeeds | pending | Isolated installed-loader smoke passed; live deployment pending |
+
+## Evidence
+
+- Unit 1: `bun test fusion/` → 60 pass / 0 fail across 3 files (263 expectations), exit 0. `bun run typecheck` → exit 0.
+- Unit 2: installed OMP loader registered `/fusion` and `session_shutdown`; an injected two-candidate command retained evidence and dissent without spawning Pi.
+- Unit 3: passing tests cover asynchronous baseline/fusion runners and separate baseline/fusion error totals.
+- Unit 4: scripts ran successfully; README documents explicit invocation, the 2-8 bound, 120-second native child timeout, cancellation, and async benchmark use.
+- Unit 5: independent final grade returned PASS for all six release contracts with no substantive blocker.
+- Unit 6: isolated installed-loader smoke passed. Live deployment, byte comparison, commit, and push remain for Main.

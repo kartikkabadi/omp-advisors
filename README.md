@@ -193,8 +193,95 @@ The validator rejects a roster that drops any mandatory phrase, grants a
 role a different tool set, misses a domain count, uses another model,
 disables an advisor, or omits a required label line.
 
+## Fusion extension
+
+`fusion/` adds a bounded, dependency-free fusion operator to OMP:
+`core.ts` (domain logic and stopping rules), `index.ts` (the OMP
+extension), and `benchmark.ts` (single-agent comparison), each with a
+`*.test.ts` suite. It runs on the installed Bun and typechecks with the
+installed TypeScript; it adds no dependencies.
+
+### Commands
+
+```bash
+bun run test:fusion   # focused fusion tests (bun test fusion/)
+bun run typecheck     # tsc --noEmit over the fusion source files
+```
+
+`typecheck` covers the three source files (`core.ts`, `benchmark.ts`,
+`index.ts`) and resolves `@oh-my-pi/pi-coding-agent` types from the OMP
+runtime install; run it where that package's types are reachable. The
+`*.test.ts` suites are not typechecked by `tsc` because they import
+`bun:test`, whose types only Bun's runtime resolves; they are exercised
+by `bun test fusion/` instead. The deployed extension resolves the same
+import at runtime.
+
+The benchmark harness has no CLI entry. `fusion/benchmark.ts` is a
+deterministic, injected library (no CLI parsing, network, or filesystem
+access): bind real runners into `await runBenchmark({ cases, baseline,
+fusion, signal? })` and read the returned summary (per-case metrics plus
+totals), or serialize it with `stableStringify`. Runners may be
+synchronous or asynchronous and report their own duration in
+`durationMs`. Errors are counted per side: `baselineErrors` / `fusionErrors`
+on each case, and `totalBaselineErrors` / `totalFusionErrors` (plus the
+combined `totalErrors`) in the totals. The harness imposes no timeout of
+its own; a caller that needs a hard per-run limit implements it inside
+its runner. `bun test fusion/` exercises the harness through
+`benchmark.test.ts`. There is no `bun run benchmark` command.
+
+### Invocation
+
+The extension is explicit-only. Invoke `/fusion <prompt>` in the OMP
+agent. It never runs on turns or in response to tool activity; it runs
+only when you type the command. The command reports its phases as it
+goes and injects the final derived synthesis as a custom message, not as
+an automatic assistant turn.
+
+### Bounds, defaults, and stopping
+
+- The candidate budget is clamped to the hard bound of 2-8
+  (`MIN_CANDIDATES` / `MAX_CANDIDATES`). Defaults: minimum 2 candidates,
+  maximum 4 (`DEFAULT_MAX_CANDIDATES`), quality threshold 0.9, marginal
+  gain threshold 0.02. `FusionOptions` overrides each within its clamp.
+- A run stops at the earliest of: the running best reaches the quality
+  threshold after the minimum candidate count; the newest candidate
+  improves the incumbent best by at most the marginal gain threshold;
+  the candidate budget is exhausted; or the run is aborted.
+
+### Output: evidence and dissent
+
+The judge dependency scores each candidate 0..1 and returns evidence
+(the reasoning that backs the score) and dissent (minority or opposing
+notes). The final synthesis is derived from the retained evidence and
+surfaced with the stop reason.
+
+### Cancellation
+
+Each run carries one `AbortSignal`. The extension wires it to
+`session_shutdown`, so ending or reloading the session aborts any
+in-flight run cleanly. Every native `pi.exec` candidate and judge call
+also pairs that signal with a fixed bounded timeout
+(`NATIVE_EXEC_TIMEOUT_MS`, 120 seconds) so a hung child cannot stall the
+run indefinitely.
+
+### No automatic mutation
+
+The extension never patches, edits, writes, or executes code on its own.
+It only runs candidate evaluations and reports results. Nothing it does
+changes your files, config, or state.
+
+### Deployment
+
+The main agent deploys `fusion/index.ts` byte-identical as
+`~/.omp/agent/extensions/fusion.ts`. The deployed file registers the
+`/fusion` command and the `session_shutdown` abort; it does not auto-run
+on turns.
+
 ## Non-goals
 
 This repository defines and validates the canonical roster. It does not
-deploy to the live `~/.omp` runtime, and it does not touch the Pi advisor
-repo. Deployment and runtime wiring are handled elsewhere.
+deploy the roster to the live `~/.omp` runtime, and it does not touch
+the Pi advisor repo. The one exception is the fusion extension:
+`fusion/index.ts` is deployed by the main agent as
+`~/.omp/agent/extensions/fusion.ts` (see Fusion extension above).
+Deployment and runtime wiring are handled elsewhere.

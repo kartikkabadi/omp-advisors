@@ -1,0 +1,11 @@
+{
+  "name": "omp-advisors",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Canonical 100-advisor OMP roster plus a bounded, dependency-free fusion extension.",
+  "scripts": {
+    "test": "bun test",
+    "test:fusion": "bun test fusion/",
+    "typecheck": "tsc --noEmit --skipLibCheck --module esnext --moduleResolution bundler --allowImportingTsExtensions fusion/core.ts fusion/benchmark.ts fusion/index.ts"
+  }
+}
