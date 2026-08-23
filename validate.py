@@ -2,7 +2,7 @@
 """Validate an OMP WATCHDOG.yml advisor roster.
 
 Usage:
-    python3 validate.py [--canonical] [path-to-WATCHDOG.yml]
+    python3 validate.py [--canonical] [--check-contract] [path-to-WATCHDOG.yml]
 
 Default path: WATCHDOG.yml in the current directory.
 
@@ -16,21 +16,44 @@ Checks (always):
 - every tool name is a known OMP built-in
 
 Checks (with --canonical):
-- exactly 100 advisors
+- exactly 100 advisors, all unique names
 - every advisor has `enabled: true` (a missing `enabled` is an error)
 - every advisor has `model` exactly equal to
   `particle/deepseek-v4-flash-0731:max`
-- the shared `instructions` block states bounded proactive emission and
-  no unchanged repeats
-- every advisor `instructions` carries explicit `Activation:`,
-  `Excludes/handoff:`, and `Cadence:` label lines (case-insensitive,
-  line-oriented; incidental keywords do not satisfy a dimension)
-- least-privilege tool policy:
-  - `github`, `task`, `hub`, `ask`, `checkpoint`, `retain`, `recall`,
-    and `reflect` are never granted to any advisor
-  - mutating/high-side-effect tools are granted only to `Fixer`
-  - `browser` and `computer` are granted only to live-evidence roles
-    plus `Fixer`
+- every advisor declares a `domain` from the 13 canonical domains, and the
+  count per domain matches the canonical roster exactly
+- every advisor holds exactly the shared broad common tool tier
+  (x-tool-tiers.common): read, glob, grep, ast_grep, lsp, web_search,
+  browser, computer, bash, edit, write, eval, debug, ast_edit,
+  security_scan, inspect_image, todo, yield. One uniform grant for every
+  role removes role-specific quarantine; the remote side-effect tools
+  (github, task, hub, ask, checkpoint, retain, recall, reflect) and other
+  memory/state tools are never granted
+- the shared `instructions` block is a hard, validator-enforced contract.
+  It must state:
+  - act on your own initiative: evaluate every relevant turn without being
+    asked, including tool-less user turns and ambient conversation
+    evidence, not only tool activity
+  - report every action and every meaningful observation to the main agent
+  - before any mutation, notify the main agent of the planned action, its
+    target, and its expected effect
+  - after any tool action, report the tool used, the target, the result,
+    and any change
+  - no silent action
+  - no unchanged repeats; evidence-anchored notes
+  - high-impact limits: finance, legal, and health advisors give
+    information and escalation only; they never decide, buy, sign,
+    diagnose, or dose
+- every advisor `instructions` carries explicit `Remit:`, `Activation:`,
+  `Cadence:`, `Excludes/handoff:`, and `Tooling:` label lines
+  (case-insensitive, line-oriented; incidental keywords do not satisfy a
+  dimension)
+- advisors in high-impact domains (finance/legal/admin, health/wellbeing)
+  must restate the information-and-escalation-only limit in their own
+  instructions
+
+`--check-contract` prints a PASS/FAIL table of the shared hard contract
+groups (useful to inspect which mandatory phrase is missing).
 
 Exits 0 on success, 1 on any error.
 """
@@ -38,6 +61,7 @@ Exits 0 on success, 1 on any error.
 import argparse
 import re
 import sys
+from collections import Counter
 
 try:
     import yaml
@@ -53,39 +77,56 @@ BUILTIN_TOOLS = {
     "eval", "github", "glob", "grep", "lsp", "inspect_image", "browser",
     "computer", "checkpoint", "rewind", "security_scan", "task", "hub",
     "todo", "web_search", "write", "memory_edit", "retain", "recall",
-    "reflect", "learn", "manage_skill", "search", "find",
+    "reflect", "learn", "manage_skill", "search", "find", "yield",
 }
 
-# Canonical roster: the exact roster --canonical enforces. The live OMP
-# advisor role already points at CANONICAL_MODEL.
+# Canonical roster: the exact roster --canonical enforces.
 CANONICAL_COUNT = 100
 CANONICAL_MODEL = "particle/deepseek-v4-flash-0731:max"
 
-# Least-privilege tool policy (enforced only in canonical mode). An
-# advisor grants tools by listing them; any tool on the restricted sets
-# must belong to the named exception, or the roster is rejected.
-# Mutating / high-side-effect tools: only the advisor named `Fixer` may
-# hold any of these, so exactly one advisor can change state.
-MUTATING_TOOLS = {
-    "bash", "edit", "write", "eval", "debug", "ast_edit", "rewind",
-    "todo", "memory_edit", "learn", "manage_skill",
-}
+# The one broad tool tier granted to every canonical advisor. Uniform on
+# purpose: any role may request and use any tool its work needs, so no
+# role-specific restriction can quarantine a response when a tool is
+# unavailable. Remote side-effect and memory/state tools are excluded by
+# construction (they are not in this set) and additionally rejected below.
+COMMON_TOOLS = [
+    "read", "glob", "grep", "ast_grep", "lsp", "web_search", "browser",
+    "computer", "bash", "edit", "write", "eval", "debug", "ast_edit",
+    "security_scan", "inspect_image", "todo", "yield",
+]
+COMMON_TOOL_SET = set(COMMON_TOOLS)
 
-# UI-driving tools: only the live-evidence roles (tool tier T4 in the
-# taxonomy) plus `Fixer` may hold these.
-UI_TOOLS = {"browser", "computer"}
-LIVE_UI_ROLES = {
-    "OnboardingFlow", "ProgressFeedback", "FormUX", "NavigationIA",
-    "VisualHierarchy", "KeyboardInteraction", "ScreenReaderFlow",
-    "TUIInteraction", "WebResponsive", "MobileGestures", "EndToEndTests",
-    "Fixer",
-}
-
-# Never granted to any canonical advisor, even `Fixer`.
+# Never granted to any canonical advisor. These are remote side-effect or
+# memory/state tools: granting them would let an advisor act outside the
+# conversation, change long-lived state, or delete its own memory without
+# the main agent's notification contract.
 FORBIDDEN_TOOLS = {
     "github", "task", "hub", "ask", "checkpoint", "retain", "recall",
-    "reflect",
+    "reflect", "memory_edit", "learn", "manage_skill", "rewind",
 }
+
+# The 13 canonical domains and the exact role count per domain (the
+# taxonomy from TaxonomyArchitect; totals to 100).
+CANONICAL_DOMAINS = {
+    "software/technical": 16,
+    "product/business": 9,
+    "finance/legal/admin": 8,
+    "career/learning": 8,
+    "health/wellbeing": 8,
+    "relationships/communication": 7,
+    "home/logistics": 7,
+    "travel/local/world affairs": 7,
+    "research/epistemics": 7,
+    "security/privacy": 7,
+    "creativity/writing": 5,
+    "long-term planning": 5,
+    "personal operations": 6,
+}
+
+# Domains whose roles must restate the information-and-escalation-only
+# limit: they may advise and escalate, never decide, buy, sign, diagnose,
+# or dose.
+HIGH_IMPACT_DOMAINS = {"finance/legal/admin", "health/wellbeing"}
 
 
 def _compiled(patterns: tuple[str, ...]) -> list[re.Pattern[str]]:
@@ -98,17 +139,9 @@ def _matches(patterns: list[re.Pattern[str]], text: str) -> bool:
     return any(p.search(text) for p in patterns)
 
 
-# Canonical per-advisor instruction checks. The canonical format is a
-# block scalar whose lines carry explicit labels (`Remit:`, `Activation:`,
-# `Cadence:`, `Excludes/handoff:`, `Tooling:`). In canonical mode each
-# dimension must be named by its own label line; loose keyword heuristics
-# are deliberately not used, so a dimension cannot pass on incidental
-# wording. Each entry is (label, human description of the requirement).
-CANONICAL_DIMENSIONS = (
-    ("Activation:", "when the advisor activates (a line starting with `Activation:`)"),
-    ("Excludes/handoff:", "what the advisor hands off or excludes (a line starting with `Excludes/handoff:`)"),
-    ("Cadence:", "how often the advisor evaluates (a line starting with `Cadence:`)"),
-)
+def _all_match(patterns: list[re.Pattern[str]], text: str) -> bool:
+    """True when every pattern matches the text."""
+    return all(p.search(text) for p in patterns)
 
 
 def _has_labeled_line(text: str, label: str) -> bool:
@@ -124,39 +157,135 @@ def _has_labeled_line(text: str, label: str) -> bool:
     )
 
 
-# The shared `instructions` block must state bounded proactive emission
-# and no unchanged repeats (the taxonomy's global emission contract).
-SHARED_EMISSION_PATTERNS = _compiled((
-    r"at most one",
-    r"one (concise |single )?(note|issue|finding) (per|max)",
-    r"one (note|issue|finding) per (advisor|update|turn)",
-    r"per (advisor|update|turn)",
-    r"evaluate (every|each) (relevant |primary )?turn",
-    r"stay silent when",
-    r"silent when",
-    r"\bsilence\b",
-    r"proactive",
-    r"no (generic|padding|filler|status)",
-    r"do not pad",
-    r"only (when|if) .{0,30}(material|issue|finding|concern)",
-    r"bounded",
+# The shared `instructions` block is a hard contract. Each entry is
+# (group name, human description, patterns); EVERY pattern in the entry
+# must match for the group to pass. This is what makes notification and
+# initiative mandatory rather than advisory: a roster whose shared block
+# drops any of these phrases is rejected.
+SHARED_CONTRACT_GROUPS = (
+    (
+        "initiative",
+        "evaluate every relevant turn without being asked, including "
+        "tool-less user turns and ambient conversation evidence",
+        _compiled((
+            r"evaluate every relevant turn",
+            r"without being asked",
+            r"tool-less",
+            r"ambient conversation",
+        )),
+    ),
+    (
+        "notify-everything",
+        "report every action and every meaningful observation to the main "
+        "agent",
+        _compiled((
+            r"report every action",
+            r"every meaningful observation",
+        )),
+    ),
+    (
+        "pre-mutation",
+        "notify the main agent before any mutation: planned action, target, "
+        "expected effect",
+        _compiled((
+            r"before any mutation",
+            r"notify the main agent of the planned action",
+            r"expected effect",
+        )),
+    ),
+    (
+        "post-action",
+        "after any tool action, report the tool used, the target, the "
+        "result, and any change",
+        _compiled((
+            r"after any tool action",
+            r"report the tool used",
+            r"any change",
+        )),
+    ),
+    (
+        "no-silent",
+        "no silent action, no silent observation",
+        _compiled((r"no silent action", r"no silent observation")),
+    ),
+    (
+        "no-repeat",
+        "no unchanged repeats; re-emit only when evidence changes",
+        _compiled((
+            r"no (unchanged )?repeat",
+            r"unless new evidence changes",
+        )),
+    ),
+    (
+        "evidence",
+        "evidence-anchored notes naming the file, symbol, line, command, "
+        "source, or date",
+        _compiled((
+            r"evidence-anchored",
+            r"name the file, symbol, line",
+        )),
+    ),
+    (
+        "high-impact",
+        "finance, legal, and health advisors give information and "
+        "escalation only; they never decide, buy, sign, diagnose, or dose",
+        _compiled((
+            r"information and escalation only",
+            r"never decide",
+            r"never[ ,]+(?:decide|buy|sign|diagnose|dose|prescribe)"
+            r"(?:[ ,]+(?:or |, )?(?:decide|buy|sign|diagnose|dose|prescribe)){0,4}",
+        )),
+    ),
+)
+
+# Per-advisor high-impact limit restated in the role's own instructions.
+ROLE_HIGH_IMPACT_PATTERNS = _compiled((
+    r"information and escalation only",
+    r"\bnever\b",
 ))
 
-SHARED_NOREPEAT_PATTERNS = _compiled((
-    r"no (unchanged )?repeat",
-    r"do not re ?emit",
-    r"re ?emit (only|unless)",
-    r"unless (new |fresh )?evidence",
-    r"new evidence",
-    r"(three|3) relevant turns?",
-    r"don'?t (re ?emit|repeat)",
-    r"not repeat",
-    r"evidence (changes|changed)",
-    r"repeat an unchanged",
-))
+# Canonical per-advisor instruction checks. The canonical format is a
+# block scalar whose lines carry explicit labels. In canonical mode each
+# dimension must be named by its own label line; loose keyword heuristics
+# are deliberately not used, so a dimension cannot pass on incidental
+# wording. Each entry is (label, human description of the requirement).
+CANONICAL_DIMENSIONS = (
+    ("Remit:", "what the advisor watches for (a line starting with `Remit:`)"),
+    ("Activation:", "when the advisor activates (a line starting with `Activation:`)"),
+    ("Cadence:", "how often the advisor evaluates (a line starting with `Cadence:`)"),
+    ("Excludes/handoff:", "what the advisor hands off or excludes (a line starting with `Excludes/handoff:`)"),
+    ("Tooling:", "which tools and reporting rules the role follows (a line starting with `Tooling:`)"),
+)
 
 
-def validate(path: str, canonical: bool = False) -> int:
+def _check_shared_contract(instructions: str) -> list[str]:
+    """Return a list of errors for a shared `instructions` block.
+
+    Every group in SHARED_CONTRACT_GROUPS must have all its patterns
+    match. A missing group is a hard contract violation.
+    """
+    errors: list[str] = []
+    for name, desc, patterns in SHARED_CONTRACT_GROUPS:
+        if not _all_match(patterns, instructions):
+            errors.append(
+                f"canonical mode: shared `instructions` must {desc} "
+                f"(contract group `{name}` is missing)"
+            )
+    return errors
+
+
+def _check_contract_table(instructions: str) -> int:
+    """Print a PASS/FAIL table of the shared contract groups; return 1 if any fail."""
+    status = 0
+    print("shared contract groups:")
+    for name, desc, patterns in SHARED_CONTRACT_GROUPS:
+        ok = _all_match(patterns, instructions)
+        status |= 0 if ok else 1
+        print(f"  [{'OK' if ok else 'FAIL'}] {name}: {desc}")
+    return status
+
+
+def validate(path: str, canonical: bool = False, check_contract: bool = False) -> int:
     errors: list[str] = []
 
     try:
@@ -177,25 +306,19 @@ def validate(path: str, canonical: bool = False) -> int:
     if not isinstance(instructions, str) or not instructions.strip():
         errors.append("top-level `instructions` must be a non-empty string")
     elif canonical:
-        if not _matches(SHARED_EMISSION_PATTERNS, instructions):
-            errors.append(
-                "canonical mode: top-level `instructions` must state bounded "
-                "proactive emission (for example, at most one note per update, "
-                "evaluate every relevant turn, stay silent when there is no "
-                "material finding)"
-            )
-        if not _matches(SHARED_NOREPEAT_PATTERNS, instructions):
-            errors.append(
-                "canonical mode: top-level `instructions` must state that "
-                "unchanged findings are not repeated (for example, no unchanged "
-                "repeats, re-emit only when evidence changes)"
-            )
+        errors.extend(_check_shared_contract(instructions))
+        if check_contract:
+            if _check_contract_table(instructions):
+                # Table already printed FAIL lines; the detailed errors are
+                # added below, so just note the failure here.
+                pass
 
     advisors = doc.get("advisors")
     if not isinstance(advisors, list) or len(advisors) == 0:
         errors.append("`advisors` must be a non-empty list")
     else:
         names: list[str] = []
+        domain_counts: Counter[str] = Counter()
         for i, adv in enumerate(advisors):
             label = f"advisors[{i}]"
             if not isinstance(adv, dict):
@@ -210,6 +333,7 @@ def validate(path: str, canonical: bool = False) -> int:
                 if name in names:
                     errors.append(f"{label}: duplicate advisor name `{name}`")
                 names.append(name)
+
             if canonical:
                 if adv.get("enabled") is not True:
                     errors.append(
@@ -220,61 +344,94 @@ def validate(path: str, canonical: bool = False) -> int:
                         f"{label} (`{name}`): `model` must be exactly "
                         f"`{CANONICAL_MODEL}` in canonical mode"
                     )
+                domain = adv.get("domain")
+                if not isinstance(domain, str) or domain not in CANONICAL_DOMAINS:
+                    errors.append(
+                        f"{label} (`{name}`): `domain` must be one of the 13 "
+                        f"canonical domains ({', '.join(sorted(CANONICAL_DOMAINS))})"
+                    )
+                else:
+                    domain_counts[domain] += 1
+                tools = adv.get("tools")
+                if tools is None:
+                    errors.append(
+                        f"{label} (`{name}`): `tools` must be present and equal "
+                        f"to the shared common tool tier in canonical mode"
+                    )
+                elif not isinstance(tools, list):
+                    errors.append(f"{label} (`{name}`): `tools` must be a list")
+                elif set(tools) != COMMON_TOOL_SET:
+                    forbidden_hit = sorted(set(tools) & FORBIDDEN_TOOLS)
+                    missing = sorted(COMMON_TOOL_SET - set(tools))
+                    extra = sorted(set(tools) - COMMON_TOOL_SET)
+                    detail = []
+                    if missing:
+                        detail.append(f"missing {len(missing)} common tools: {', '.join(missing)}")
+                    if extra:
+                        detail.append(f"extra tools: {', '.join(extra)}")
+                    if forbidden_hit:
+                        detail.append(f"forbidden tools granted: {', '.join(forbidden_hit)}")
+                    errors.append(
+                        f"{label} (`{name}`): `tools` must be exactly the shared "
+                        f"broad common tool tier ({len(COMMON_TOOLS)} tools) so "
+                        f"every role is uniformly equipped and no role-specific "
+                        f"quarantine is possible. {'; '.join(detail) or 'mismatch.'}"
+                    )
+                else:
+                    # Set equality already proves no forbidden tool is granted.
+                    pass
             else:
                 enabled = adv.get("enabled")
                 if enabled is not None and not isinstance(enabled, bool):
                     errors.append(f"{label} (`{name}`): `enabled` must be true or false")
-            tools = adv.get("tools")
-            if tools is not None:
-                if not isinstance(tools, list):
-                    errors.append(f"{label} (`{name}`): `tools` must be a list")
-                else:
-                    for tool in tools:
-                        if not isinstance(tool, str) or tool not in BUILTIN_TOOLS:
-                            errors.append(
-                                f"{label} (`{name}`): unknown tool `{tool}`"
-                            )
-                            continue
-                        if canonical and valid_name:
-                            if tool in FORBIDDEN_TOOLS:
+                tools = adv.get("tools")
+                if tools is not None:
+                    if not isinstance(tools, list):
+                        errors.append(f"{label} (`{name}`): `tools` must be a list")
+                    else:
+                        for tool in tools:
+                            if not isinstance(tool, str) or tool not in BUILTIN_TOOLS:
                                 errors.append(
-                                    f"{label} (`{name}`): tool `{tool}` is "
-                                    f"forbidden in canonical mode (github, task, "
-                                    f"hub, ask, checkpoint, retain, recall, and "
-                                    f"reflect are never granted)"
+                                    f"{label} (`{name}`): unknown tool `{tool}`"
                                 )
-                            elif tool in MUTATING_TOOLS and name != "Fixer":
-                                errors.append(
-                                    f"{label} (`{name}`): tool `{tool}` is "
-                                    f"restricted in canonical mode: only the "
-                                    f"`Fixer` advisor may hold "
-                                    f"mutating/high-side-effect tools"
-                                )
-                            elif tool in UI_TOOLS and name not in LIVE_UI_ROLES:
-                                errors.append(
-                                    f"{label} (`{name}`): tool `{tool}` is "
-                                    f"restricted in canonical mode: only the "
-                                    f"live-evidence roles and `Fixer` may hold "
-                                    f"UI tools"
-                                )
+
             instructions = adv.get("instructions")
             if not isinstance(instructions, str) or not instructions.strip():
                 errors.append(
                     f"{label} (`{name}`): `instructions` must be a non-empty string"
                 )
             elif canonical:
-                for label, desc in CANONICAL_DIMENSIONS:
-                    if not _has_labeled_line(instructions, label):
+                for dim_label, desc in CANONICAL_DIMENSIONS:
+                    if not _has_labeled_line(instructions, dim_label):
                         errors.append(
                             f"{label} (`{name}`): `instructions` must state "
                             f"{desc}"
                         )
+                if valid_name:
+                    role_domain = adv.get("domain")
+                    if isinstance(role_domain, str) and role_domain in HIGH_IMPACT_DOMAINS:
+                        if not _all_match(ROLE_HIGH_IMPACT_PATTERNS, instructions):
+                            errors.append(
+                                f"{label} (`{name}`): advisor is in the "
+                                f"high-impact domain `{role_domain}` and must "
+                                f"state in its own instructions that it gives "
+                                f"information and escalation only (never "
+                                f"decide, buy, sign, diagnose, or dose)"
+                            )
 
-        if canonical and len(advisors) != CANONICAL_COUNT:
-            errors.append(
-                f"canonical roster must have exactly {CANONICAL_COUNT} advisors, "
-                f"found {len(advisors)}"
-            )
+        if canonical:
+            if len(advisors) != CANONICAL_COUNT:
+                errors.append(
+                    f"canonical roster must have exactly {CANONICAL_COUNT} advisors, "
+                    f"found {len(advisors)}"
+                )
+            for domain, expected in CANONICAL_DOMAINS.items():
+                actual = domain_counts[domain]
+                if actual != expected:
+                    errors.append(
+                        f"canonical domain `{domain}` must have exactly {expected} "
+                        f"advisors, found {actual}"
+                    )
 
     if errors:
         for err in errors:
@@ -292,12 +449,19 @@ def main() -> int:
     parser.add_argument(
         "--canonical",
         action="store_true",
-        help="enforce the canonical roster: exactly 100 advisors, all enabled, "
-        "all with model " + CANONICAL_MODEL + ", shared and per-advisor "
-        "instructions stating the emission and activation/handoff/cadence "
-        "contract, and least-privilege tool policy (forbidden tools never "
-        "granted; mutating tools only on Fixer; browser/computer only on "
-        "live-evidence roles and Fixer)",
+        help="enforce the canonical roster: exactly 100 advisors across the 13 "
+        "domains with exact per-domain counts, all enabled, all with model "
+        + CANONICAL_MODEL + ", all holding the shared broad common tool tier, "
+        "a shared hard contract (initiative over tool-less turns and ambient "
+        "conversation, notification of every action/observation, pre-mutation "
+        "notice, post-action reporting, no silent action, no unchanged repeats, "
+        "evidence anchors, high-impact limits), the five per-role label lines, "
+        "and per-role high-impact limits",
+    )
+    parser.add_argument(
+        "--check-contract",
+        action="store_true",
+        help="print a PASS/FAIL table of the shared contract phrase groups",
     )
     parser.add_argument(
         "path",
@@ -306,7 +470,7 @@ def main() -> int:
         help="path to the WATCHDOG.yml file (default: WATCHDOG.yml)",
     )
     args = parser.parse_args()
-    return validate(args.path, canonical=args.canonical)
+    return validate(args.path, canonical=args.canonical, check_contract=args.check_contract)
 
 
 if __name__ == "__main__":

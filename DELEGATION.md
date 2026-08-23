@@ -1,10 +1,10 @@
 # Delegation plan
 Units: 5
 
-| # | Unit | Files (mine) | Worker (subagent) | Acceptance | Status |
-|---|---|---|---|---|---|
-| 1 | Design 100 exclusive advisor roles | `local://advisor-100-taxonomy.md` | taxonomy-designer | Exactly 100 distinct roles grouped by domain, each with ownership and activation evidence | verified: 5 pods x 20 unique roles |
-| 2 | Build 100-advisor canonical roster | `WATCHDOG.yml` | roster-builder | Exactly 100 enabled DSV4F-max advisors with proactive bounded emission and least privilege | verified: canonical validation passed |
-| 3 | Enforce 100-advisor canonical contract | `validate.py` | validator-builder | Canonical mode requires count/model/enabled/tool/emission contracts | verified: positive and 300 label-removal checks passed |
-| 4 | Document 100-advisor operating model | `README.md` | docs-builder | README lists 100 roles and accurately explains proactive non-spam behavior | verified: names and behavior matched roster/runtime |
-| 5 | Tune and deploy live configuration | `~/.omp/agent/config.yml`, `~/.omp/agent/WATCHDOG.yml` | live-deployer | syncBacklog off; live roster byte-identical to canonical | verified: cmp and config checks passed |
+| # | Unit | Files (mine) | Worker (subagent) | Acceptance | Status | Evidence |
+|---|------|--------------|-------------------|------------|--------|----------|
+| 1 | Trace OMP advisor runtime and tool contract | read-only OMP installation/config | RuntimeScout | Exact runtime behavior and valid tool policy proven | done | Runtime fact captured: configured tools are intersected with the session pool, so an unavailable tool call quarantines the whole response. Applied as the core design constraint: every role gets one broad common tool tier so no role-specific quarantine is possible. |
+| 2 | Audit existing roster domains and design 100-role world taxonomy | read-only WATCHDOG.yml | TaxonomyArchitect | Exactly 100 non-overlapping roles across broad life/work/world domains | done | Taxonomy artifact (agent://TaxonomyArchitect) delivered 100 unique roles across 13 domains with exact counts 16/9/8/8/8/7/7/7/7/7/5/5/6; roster applied verbatim to WATCHDOG.yml and validator enforces the counts. |
+| 3 | Rewrite canonical roster and validator | WATCHDOG.yml, validate.py, README.md | RosterBuilder | Canonical validator passes and all roles have proactive/notification/tool contracts | verified | WATCHDOG.yml rewritten (100 roles, 13 domains, shared common tier, hard shared contract); validate.py enforces domain counts, common grant, exact model, notification/initiative/high-impact phrases. `python3 validate.py --canonical --check-contract WATCHDOG.yml` passes (8/8 contract groups); `py_compile` OK; 7 deliberately broken variants all rejected; `git diff --check` clean. |
+| 4 | Align Pi integration with expanded advisor tools | pi-adviser/adviser.ts, roster.ts, test.ts | PiBuilder | Pi exposes intended tools safely and test suite passes | pending | |
+| 5 | Independent final review | read-only all artifacts | FinalGrader | Every acceptance criterion receives PASS with evidence | pending | |
