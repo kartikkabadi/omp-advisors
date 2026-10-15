@@ -222,10 +222,10 @@ def validate(path: str, canonical: bool = False) -> int:
                     )
             else:
                 enabled = adv.get("enabled")
-                if enabled is not None and not isinstance(enabled, bool):
+                if "enabled" in adv and not isinstance(enabled, bool):
                     errors.append(f"{label} (`{name}`): `enabled` must be true or false")
             tools = adv.get("tools")
-            if tools is not None:
+            if "tools" in adv:
                 if not isinstance(tools, list):
                     errors.append(f"{label} (`{name}`): `tools` must be a list")
                 else:
@@ -311,3 +311,4 @@ def main() -> int:
 
 if __name__ == "__main__":
     sys.exit(main())
+
