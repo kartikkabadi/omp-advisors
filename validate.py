@@ -162,7 +162,7 @@ def validate(path: str, canonical: bool = False) -> int:
     try:
         with open(path, "r", encoding="utf-8") as fh:
             doc = yaml.safe_load(fh)
-    except OSError as exc:
+    except (OSError, UnicodeError) as exc:
         print(f"error: cannot read {path}: {exc}")
         return 1
     except yaml.YAMLError as exc:
